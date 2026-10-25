@@ -1,0 +1,103 @@
+# Workflow complementario a Azure Pipelines: validación de Pull Requests en GitHub.
+name: PR checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-test:
+    name: Lint y pruebas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-fund
+      - run: npm run lint
+      - run: npm run build
+      - run: npm run test:ci
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: cobertura
+          path: backend/coverage/
+
+  integration:
+    name: Integración con PostgreSQL real
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: incident_hub
+          POSTGRES_USER: incident
+          POSTGRES_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U incident -d incident_hub"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DB_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-fund
+      - name: Migrar esquema y seed
+        run: npm run migrate
+      - name: Levantar API
+        run: |
+          npm start -w backend > api.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:3000/health && break; sleep 1; done
+      - name: Flujo de punta a punta
+        run: |
+          set -e
+          id=$(curl -sf -X POST http://localhost:3000/api/incidents -H 'Content-Type: application/json' \
+            -d '{"title":"Prueba CI","description":"Creado por GitHub Actions","category":"OTRO","priority":"BAJA","reportedBy":"ci"}' | jq .id)
+          curl -sf -X PATCH http://localhost:3000/api/incidents/$id/assign -H 'Content-Type: application/json' -d '{"technicianId":1}' | jq -e '.status == "ASIGNADO"'
+          curl -sf "http://localhost:3000/api/incidents?status=ASIGNADO" | jq -e 'length == 1'
+          curl -sf http://localhost:3000/api/incidents/$id/comments | jq -e '.[0].type == "SISTEMA"'
+      - name: Log de la API
+        if: always()
+        run: cat api.log
+
+  dependencies:
+    name: Revisión de dependencias
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: npm audit (producción, severidad alta)
+        run: npm audit --omit=dev --audit-level=high
+      - name: Dependency review
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+
+  secrets-scan:
+    name: Escaneo de secretos (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
