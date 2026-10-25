@@ -2,6 +2,20 @@
 
 Todas las versiones siguen [Semantic Versioning](https://semver.org/lang/es/) y el formato de [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [0.3.0] - 2026-10-24
+
+### Agregado
+- Pipeline de Azure en agente self-hosted: lint, build, pruebas con cobertura, npm audit, empaquetado y artefacto `incident-hub` (AB#33, AB#32).
+- Umbral de calidad de cobertura del 90 % y pruebas de casos límite (AB#34).
+- Workflow de GitHub Actions para PR: lint/pruebas, integración con PostgreSQL real, revisión de dependencias y gitleaks (AB#35).
+- Dependabot semanal para npm y GitHub Actions (AB#37).
+- Documentación: `docs/evidence.md`, `docs/tech-debt.md`, `docs/dependencies.md`, `docs/security.md`.
+
+### Cambiado
+- Validación de entradas con esquemas zod; resuelve TD-1 (AB#38).
+- Configuración por variables de entorno; `DB_PASSWORD` es obligatoria. Resuelve TD-2 (AB#39).
+- ESLint 10 y globals 17 (Dependabot #4).
+
 ## [0.2.0] - 2026-10-24
 
 ### Agregado

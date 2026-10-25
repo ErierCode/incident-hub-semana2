@@ -11,9 +11,9 @@ Solución web para registrar, operar y dar seguimiento a incidentes de TI. Susti
 ## Instalación
 
 ```bash
-git clone https://github.com/ErierCode/incident-hub-semana1.git
-cd incident-hub-semana1
-cp .env.example .env        # definir DB_PASSWORD
+git clone https://github.com/ErierCode/incident-hub-semana2.git
+cd incident-hub-semana2
+cp .env.example .env        # definir DB_PASSWORD (obligatoria)
 npm install
 ```
 
@@ -62,6 +62,18 @@ docs/        arquitectura, ramas y demás documentación
 
 - [Arquitectura](docs/architecture.md)
 - [Estrategia de ramas](docs/branching.md)
+- [Deuda técnica](docs/tech-debt.md)
+- [Seguridad y secretos](docs/security.md)
+- [Análisis de dependencias](docs/dependencies.md)
+- [Evidencias DevOps](docs/evidence.md)
+
+## CI/CD
+
+| Sistema | Archivo | Cuándo corre |
+|---|---|---|
+| Azure Pipelines (agente self-hosted) | `azure-pipelines.yml` | PR hacia `main`, push a `main`, tags `v*` |
+| GitHub Actions | `.github/workflows/ci.yml` | PR hacia `main`, push a `main` |
+| Dependabot | `.github/dependabot.yml` | Semanal |
 
 ## Responsables
 
