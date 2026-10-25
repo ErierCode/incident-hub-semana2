@@ -48,4 +48,23 @@ El PR introdujo un **umbral de calidad** (`coverageThreshold` del 90 % en `backe
 
 ### Ejecución exitosa
 
-La ejecución de PR #1 posterior al merge de la corrección se registra abajo.
+| Campo | Detalle |
+|---|---|
+| Ejecución | [Build #12](https://dev.azure.com/epur/proyectoFinal/_build/results?buildId=12): **succeeded** en 2 min |
+| Commit | `122d6b3`, merge de la corrección en `feature/AB33-azure-pipeline` |
+| Pruebas | 51 en verde, publicadas en la pestaña *Tests* |
+| Cobertura | Branches 95.83 %, publicada en la pestaña *Code Coverage* |
+| Artefactos | `incident-hub` (zip `incident-hub-0.2.0.zip` + `npm-audit.json`, 71 KB) y `Code Coverage Report_12` |
+
+Secuencia completa: **build #11 fallido → diagnóstico → `fix/AB34-coverage-tests` (PR #2) → build #12 exitoso → merge del PR #1 a `main`**.
+
+## Agente self-hosted
+
+| Campo | Detalle |
+|---|---|
+| Nombre | `agente-pc-erick` |
+| Pool | `Default` (organización `epur`) |
+| Versión | 5.280.0 (win-x64) |
+| Ubicación | `C:\agent`, modo interactivo (`run.cmd`) |
+| Registro | PAT con alcance *Agent Pools (Read & manage)* ingresado por consola; no se almacena en el repositorio |
+| Evidencia | Los builds #11 y #12 muestran `Agent: agente-pc-erick` y rutas `C:\agent\_work\1\s` en el log |
