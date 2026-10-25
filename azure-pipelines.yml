@@ -1,0 +1,102 @@
+# IT Incident Hub - Integración continua en Azure Pipelines
+# Se ejecuta en el agente self-hosted (pool Default) para cada PR hacia main,
+# cada push a main y cada tag de versión v*.
+
+trigger:
+  branches:
+    include: [main]
+  tags:
+    include: ['v*']
+
+pr:
+  branches:
+    include: [main]
+
+pool:
+  name: Default
+
+variables:
+  nodeVersion: '22.x'
+  npm_config_cache: $(Pipeline.Workspace)/.npm
+
+stages:
+  - stage: CI
+    displayName: Integración continua
+    jobs:
+      - job: Build
+        displayName: Build, pruebas y artefacto
+        steps:
+          - checkout: self
+            clean: true
+            fetchDepth: 1
+
+          - task: UseNode@1
+            displayName: Usar Node.js $(nodeVersion)
+            inputs:
+              version: $(nodeVersion)
+
+          - powershell: |
+              $version = node -p "require('./package.json').version"
+              Write-Host "##vso[task.setvariable variable=appVersion]$version"
+              Write-Host "##vso[build.updatebuildnumber]$version+$(Build.BuildId)"
+              Write-Host "Versión de la aplicación: $version"
+            displayName: Leer versión (SemVer)
+
+          - script: npm ci --no-fund
+            displayName: Instalar dependencias (npm ci)
+
+          - script: npm run lint
+            displayName: Lint (ESLint)
+
+          - script: npm run build
+            displayName: Build
+
+          - script: npm run test:ci
+            displayName: Pruebas unitarias e integración (Jest)
+
+          - task: PublishTestResults@2
+            displayName: Publicar resultados de pruebas
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: '**/reports/junit.xml'
+              testRunTitle: Pruebas backend $(appVersion)
+
+          - task: PublishCodeCoverageResults@2
+            displayName: Publicar cobertura
+            condition: succeededOrFailed()
+            inputs:
+              summaryFileLocation: backend/coverage/cobertura-coverage.xml
+
+          - powershell: |
+              npm audit --json | Out-File -Encoding utf8 npm-audit.json
+              npm audit --omit=dev --audit-level=high
+              if ($LASTEXITCODE -ne 0) {
+                Write-Host "##vso[task.logissue type=error]Vulnerabilidades altas o críticas en dependencias de producción"
+                exit 1
+              }
+              Write-Host "Sin vulnerabilidades altas o críticas en dependencias de producción"
+            displayName: Revisión de dependencias (npm audit)
+
+          - script: npm run package
+            displayName: Empaquetar aplicación
+
+          - task: ArchiveFiles@2
+            displayName: Comprimir paquete
+            inputs:
+              rootFolderOrFile: dist/incident-hub
+              includeRootFolder: false
+              archiveType: zip
+              archiveFile: $(Build.ArtifactStagingDirectory)/incident-hub-$(appVersion).zip
+
+          - task: CopyFiles@2
+            displayName: Adjuntar reporte de dependencias
+            inputs:
+              Contents: npm-audit.json
+              TargetFolder: $(Build.ArtifactStagingDirectory)
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publicar artefacto
+            inputs:
+              targetPath: $(Build.ArtifactStagingDirectory)
+              artifact: incident-hub
